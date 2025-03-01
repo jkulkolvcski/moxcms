@@ -30,7 +30,7 @@
 #![deny(unreachable_pub)]
 mod chad;
 mod cicp;
-mod clut;
+mod conversions;
 mod err;
 mod gamut;
 mod lab;
@@ -45,7 +45,6 @@ mod oklab;
 mod oklch;
 mod profile;
 mod rgb;
-mod stages;
 mod transform;
 mod trc;
 
@@ -54,7 +53,7 @@ pub use lab::Lab;
 pub use luv::{LCh, Luv};
 pub use math::{
     atan2f, atanf, cbrtf, const_hypotf, cosf, exp, expf, floor, floorf, hypotf, log, logf, pow,
-    powf, sinf, sqrtf,
+    powf, rounding_div_ceil, sinf, sqrtf,
 };
 pub use matrix::{
     BT2020_MATRIX, Chromacity, DISPLAY_P3_MATRIX, Matrix3f, SRGB_MATRIX, Vector3, Vector3f,
