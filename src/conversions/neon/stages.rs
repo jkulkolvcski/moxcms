@@ -26,127 +26,104 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::mlaf::mlaf;
-use crate::{CmsError, InPlaceStage, Layout, Matrix3f};
+use crate::conversions::TransformProfileRgb;
+use crate::{CmsError, Layout, Matrix3f, TransformExecutor};
+use num_traits::AsPrimitive;
 use std::arch::aarch64::*;
 
-pub(crate) struct MatrixClipScaleStageNeon<const LAYOUT: u8> {
-    pub(crate) matrix: Matrix3f,
-    pub(crate) scale: f32,
+#[repr(align(16), C)]
+struct NeonAlignedU16([u16; 8]);
+
+pub(crate) struct TransformProfilePcsXYZRgbNeon<
+    T: Clone + AsPrimitive<usize> + Default,
+    const SRC_LAYOUT: u8,
+    const DST_LAYOUT: u8,
+    const LINEAR_CAP: usize,
+    const GAMMA_LUT: usize,
+    const BIT_DEPTH: usize,
+> {
+    pub(crate) profile: TransformProfileRgb<T, LINEAR_CAP>,
 }
 
-impl<const LAYOUT: u8> InPlaceStage for MatrixClipScaleStageNeon<LAYOUT> {
-    #[inline]
-    fn transform(&self, dst: &mut [f32]) -> Result<(), CmsError> {
-        let scale = self.scale;
-        let cn = Layout::from(LAYOUT);
-        let channels = cn.channels();
+impl<
+    T: Clone + AsPrimitive<usize> + Default,
+    const SRC_LAYOUT: u8,
+    const DST_LAYOUT: u8,
+    const LINEAR_CAP: usize,
+    const GAMMA_LUT: usize,
+    const BIT_DEPTH: usize,
+> TransformExecutor<T>
+    for TransformProfilePcsXYZRgbNeon<T, SRC_LAYOUT, DST_LAYOUT, LINEAR_CAP, GAMMA_LUT, BIT_DEPTH>
+where
+    u32: AsPrimitive<T>,
+{
+    fn transform(&self, src: &[T], dst: &mut [T]) -> Result<(), CmsError> {
+        let src_cn = Layout::from(SRC_LAYOUT);
+        let dst_cn = Layout::from(DST_LAYOUT);
+        let src_channels = src_cn.channels();
+        let dst_channels = dst_cn.channels();
 
-        let transform = self.matrix;
+        let mut temporary = NeonAlignedU16([0; 8]);
 
-        let full_length = dst.len();
-
-        let mut x = 0usize;
-
-        unsafe {
-            let m0 = vld1q_f32(self.matrix.v.as_ptr() as *mut f32);
-            let m1 = vld1q_f32((self.matrix.v.as_ptr() as *mut f32).add(4));
-            let m2 = vdupq_n_f32(self.matrix.v[2][2]);
-            let v_scale = vdupq_n_f32(scale);
-            let zeros = vdupq_n_f32(0f32);
-
-            while x + 4 * channels < full_length {
-                let src_data = if channels == 4 {
-                    vld4q_f32(dst.get_unchecked(x..).as_ptr())
-                } else {
-                    let values = vld3q_f32(dst.get_unchecked(x..).as_ptr());
-                    float32x4x4_t(values.0, values.1, values.2, vdupq_n_f32(1f32))
-                };
-
-                let r = src_data.0;
-                let g = src_data.1;
-                let b = src_data.2;
-
-                let mut r0 = vmulq_laneq_f32::<0>(r, m0);
-                let mut g0 = vmulq_laneq_f32::<3>(r, m0);
-                let mut b0 = vmulq_laneq_f32::<2>(r, m1);
-
-                r0 = vfmaq_laneq_f32::<1>(r0, g, m0);
-                g0 = vfmaq_laneq_f32::<0>(g0, g, m1);
-                b0 = vfmaq_laneq_f32::<3>(b0, g, m1);
-
-                r0 = vfmaq_laneq_f32::<2>(r0, b, m0);
-                g0 = vfmaq_laneq_f32::<1>(g0, b, m1);
-                b0 = vfmaq_f32(b0, b, m2);
-
-                r0 = vmaxq_f32(r0, zeros);
-                g0 = vmaxq_f32(g0, zeros);
-                b0 = vmaxq_f32(b0, zeros);
-
-                r0 = vfmaq_f32(vdupq_n_f32(0.5f32), r0, v_scale);
-                g0 = vfmaq_f32(vdupq_n_f32(0.5f32), g0, v_scale);
-                b0 = vfmaq_f32(vdupq_n_f32(0.5f32), b0, v_scale);
-
-                r0 = vminq_f32(r0, v_scale);
-                g0 = vminq_f32(g0, v_scale);
-                b0 = vminq_f32(b0, v_scale);
-
-                if channels == 4 {
-                    vst4q_f32(
-                        dst.get_unchecked_mut(x..).as_mut_ptr(),
-                        float32x4x4_t(r0, g0, b0, src_data.3),
-                    );
-                } else if channels == 3 {
-                    vst3q_f32(
-                        dst.get_unchecked_mut(x..).as_mut_ptr(),
-                        float32x4x3_t(r0, g0, b0),
-                    );
-                }
-
-                x += 4 * channels;
-            }
+        if src.len() / src_channels != dst.len() / dst_channels {
+            return Err(CmsError::LaneSizeMismatch);
+        }
+        if src.len() % src_channels != 0 {
+            return Err(CmsError::LaneMultipleOfChannels);
+        }
+        if dst.len() % dst_channels != 0 {
+            return Err(CmsError::LaneMultipleOfChannels);
         }
 
-        for chunk in dst.chunks_exact_mut(channels).skip(x / channels) {
-            let r = chunk[0];
-            let g = chunk[1];
-            let b = chunk[2];
+        let t = self
+            .profile
+            .adaptation_matrix
+            .unwrap_or(Matrix3f::IDENTITY)
+            .transpose();
+        let scale = (GAMMA_LUT - 1) as f32;
+        let max_colors = (1 << BIT_DEPTH) - 1;
 
-            chunk[0] = mlaf(
-                0.5f32,
-                mlaf(
-                    mlaf(r * transform.v[0][0], g, transform.v[0][1]),
-                    b,
-                    transform.v[0][2],
-                )
-                .max(0f32)
-                .min(1f32),
-                scale,
-            );
+        unsafe {
+            let m0 = vld1q_f32([t.v[0][0], t.v[0][1], t.v[0][2], 0f32].as_ptr());
+            let m1 = vld1q_f32([t.v[1][0], t.v[1][1], t.v[1][2], 0f32].as_ptr());
+            let m2 = vld1q_f32([t.v[2][0], t.v[2][1], t.v[2][2], 0f32].as_ptr());
 
-            chunk[1] = mlaf(
-                0.5f32,
-                mlaf(
-                    mlaf(r * transform.v[1][0], g, transform.v[1][1]),
-                    b,
-                    transform.v[1][2],
-                )
-                .max(0f32)
-                .min(1f32),
-                scale,
-            );
+            let zeros = vdupq_n_f32(0f32);
 
-            chunk[2] = mlaf(
-                0.5f32,
-                mlaf(
-                    mlaf(r * transform.v[2][0], g, transform.v[2][1]),
-                    b,
-                    transform.v[2][2],
-                )
-                .max(0f32)
-                .min(1f32),
-                scale,
-            )
+            let v_scale = vdupq_n_f32(scale);
+
+            for (src, dst) in src
+                .chunks_exact(src_channels)
+                .zip(dst.chunks_exact_mut(dst_channels))
+            {
+                let r = vld1q_dup_f32(self.profile.r_linear.get_unchecked(src[src_cn.r_i()].as_()));
+                let g = vld1q_dup_f32(self.profile.g_linear.get_unchecked(src[src_cn.g_i()].as_()));
+                let b = vld1q_dup_f32(self.profile.b_linear.get_unchecked(src[src_cn.b_i()].as_()));
+                let a = if src_channels == 4 {
+                    f32::from_bits(src[src_cn.a_i()].as_() as u32)
+                } else {
+                    f32::from_bits(max_colors)
+                };
+
+                let v0 = vmulq_f32(r, m0);
+                let v1 = vmulq_f32(g, m1);
+                let v2 = vmulq_f32(b, m2);
+
+                let mut v = vaddq_f32(vaddq_f32(v0, v1), v2);
+                v = vmaxq_f32(v, zeros);
+                v = vfmaq_f32(vdupq_n_f32(0.5f32), v, v_scale);
+                v = vminq_f32(v, v_scale);
+
+                let zx = vcvtaq_u32_f32(v);
+                vst1q_u32(temporary.0.as_mut_ptr() as *mut _, zx);
+
+                dst[dst_cn.r_i()] = self.profile.r_gamma[temporary.0[0] as usize];
+                dst[dst_cn.g_i()] = self.profile.g_gamma[temporary.0[2] as usize];
+                dst[dst_cn.b_i()] = self.profile.b_gamma[temporary.0[4] as usize];
+                if dst_channels == 4 {
+                    dst[dst_cn.a_i()] = a.to_bits().as_();
+                }
+            }
         }
 
         Ok(())
