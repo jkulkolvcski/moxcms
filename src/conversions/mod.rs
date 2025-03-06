@@ -36,6 +36,8 @@ mod rgb2gray;
 mod rgbxyz;
 mod stages;
 mod tetrahedral;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod avx;
 
 pub(crate) use cmyk::{CompressCmykLut, make_cmyk_luts};
 pub(crate) use gray2rgb::make_gray_to_x;
