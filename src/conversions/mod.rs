@@ -26,14 +26,20 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod avx;
 mod chunking;
 mod cmyk;
 mod gray2rgb;
 mod lut3;
 mod lut3_to_4;
 mod lut4;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+mod neon;
 mod rgb2gray;
 mod rgbxyz;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod sse;
 mod stages;
 mod tetrahedral;
 
@@ -41,4 +47,3 @@ pub(crate) use cmyk::{CompressCmykLut, make_cmyk_luts};
 pub(crate) use gray2rgb::make_gray_to_x;
 pub(crate) use rgb2gray::{ToneReproductionRgbToGray, make_rgb_to_gray};
 pub(crate) use rgbxyz::{TransformProfileRgb, make_rgb_xyz_rgb_transform};
-pub(crate) use stages::{GamutClipScaleStage, MatrixClipScaleStage, MatrixStage};
