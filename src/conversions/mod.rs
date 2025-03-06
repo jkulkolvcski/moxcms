@@ -38,9 +38,11 @@ mod stages;
 mod tetrahedral;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 mod avx;
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+mod sse;
 
 pub(crate) use cmyk::{CompressCmykLut, make_cmyk_luts};
 pub(crate) use gray2rgb::make_gray_to_x;
 pub(crate) use rgb2gray::{ToneReproductionRgbToGray, make_rgb_to_gray};
 pub(crate) use rgbxyz::{TransformProfileRgb, make_rgb_xyz_rgb_transform};
-pub(crate) use stages::{GamutClipScaleStage, MatrixClipScaleStage, MatrixStage};
+pub(crate) use stages::{GamutClipScaleStage, MatrixClipScaleStage, MatrixStage, GammaSearchFactory};
