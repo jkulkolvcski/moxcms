@@ -42,7 +42,14 @@ struct TetrahedralFetchVector3f<'a, const GRID_SIZE: usize> {
     cube: &'a [f32],
 }
 
+pub(crate) trait TetrhedralInterpolation<'a, const GRID_SIZE: usize> {
+    fn new(table: &'a [f32]) -> Self;
+    fn inter3(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector3f;
+    fn inter4(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector4f;
+}
+
 impl<const GRID_SIZE: usize> Fetcher<Vector3f> for TetrahedralFetchVector3f<'_, GRID_SIZE> {
+    #[inline(always)]
     fn fetch(&self, x: i32, y: i32, z: i32) -> Vector3f {
         let offset = (x as u32 * (GRID_SIZE as u32 * GRID_SIZE as u32)
             + y as u32 * GRID_SIZE as u32
@@ -74,10 +81,6 @@ impl<const GRID_SIZE: usize> Fetcher<Vector4f> for TetrahedralFetchVector4f<'_, 
 }
 
 impl<'a, const GRID_SIZE: usize> Tetrahedral<'a, GRID_SIZE> {
-    pub(crate) fn new(table: &'a [f32]) -> Self {
-        Self { cube: table }
-    }
-
     #[inline]
     fn interpolate<
         T: Copy
@@ -148,24 +151,32 @@ impl<'a, const GRID_SIZE: usize> Tetrahedral<'a, GRID_SIZE> {
         let s1 = s0.mla(c2, T::from(ry));
         s1.mla(c3, T::from(rz))
     }
+}
 
-    #[inline(always)]
-    pub(crate) fn inter4(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector4f {
-        self.interpolate(
-            in_r,
-            in_g,
-            in_b,
-            TetrahedralFetchVector4f::<GRID_SIZE> { cube: &self.cube },
-        )
+impl<'a, const GRID_SIZE: usize> TetrhedralInterpolation<'a, GRID_SIZE>
+    for Tetrahedral<'a, GRID_SIZE>
+{
+    fn new(table: &'a [f32]) -> Self {
+        Self { cube: table }
     }
 
     #[inline(always)]
-    pub(crate) fn inter3(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector3f {
+    fn inter3(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector3f {
         self.interpolate(
             in_r,
             in_g,
             in_b,
             TetrahedralFetchVector3f::<GRID_SIZE> { cube: &self.cube },
+        )
+    }
+
+    #[inline(always)]
+    fn inter4(&self, in_r: u8, in_g: u8, in_b: u8) -> Vector4f {
+        self.interpolate(
+            in_r,
+            in_g,
+            in_b,
+            TetrahedralFetchVector4f::<GRID_SIZE> { cube: &self.cube },
         )
     }
 }
