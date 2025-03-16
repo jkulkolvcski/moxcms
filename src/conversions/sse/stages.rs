@@ -35,7 +35,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[repr(align(16), C)]
-struct SseAlignedU16([u16; 8]);
+pub(crate) struct SseAlignedU16(pub(crate) [u16; 8]);
 
 pub(crate) struct TransformProfilePcsXYZRgbSse<
     T: Clone + AsPrimitive<usize> + Default,
