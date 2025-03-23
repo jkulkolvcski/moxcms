@@ -26,13 +26,27 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::conversions::rgbxyz_fixed::{
-    TransformProfileRgbFixedPoint, split_by_twos, split_by_twos_mut,
-};
+use crate::conversions::rgbxyz_fixed::TransformProfileRgbFixedPoint;
 use crate::transform::PointeeSizeExpressible;
 use crate::{CmsError, Layout, TransformExecutor};
 use num_traits::AsPrimitive;
 use std::arch::aarch64::*;
+
+#[allow(dead_code)]
+#[inline]
+pub(crate) fn split_by_twos<T: Copy>(data: &[T], channels: usize) -> (&[T], &[T]) {
+    let len = data.len() / channels;
+    let split_point = len / 2 * 2;
+    data.split_at(split_point * channels)
+}
+
+#[allow(dead_code)]
+#[inline]
+pub(crate) fn split_by_twos_mut<T: Copy>(data: &mut [T], channels: usize) -> (&mut [T], &mut [T]) {
+    let len = data.len() / channels;
+    let split_point = len / 2 * 2;
+    data.split_at_mut(split_point * channels)
+}
 
 pub(crate) struct TransformProfileRgbQ12Neon<
     T: Copy,
@@ -98,7 +112,7 @@ where
 
             let rnd = vdupq_n_s32((1 << (PRECISION - 1)) - 1);
 
-            if src_chunks.len() > 0 {
+            if !src_chunks.is_empty() {
                 let (src0, src1) = src_chunks.split_at(src_chunks.len() / 2);
                 let (dst0, dst1) = dst_chunks.split_at_mut(dst_chunks.len() / 2);
                 let mut src_iter0 = src0.chunks_exact(src_channels * 2);
