@@ -99,17 +99,14 @@ pub(crate) fn prepare_mab_4x3<const GRID_SIZE: usize>(
     lut: &mut [f32],
     options: TransformOptions,
 ) -> Result<Vec<f32>, CmsError> {
-    const LERP_DEPTH: usize = 256;
-    const BP: usize = 8;
+    const LERP_DEPTH: usize = 65536;
+    const BP: usize = 13;
+    const DEPTH: usize = 8192;
     if mab.num_input_channels != 4 && mab.num_output_channels != 3 {
         return Err(CmsError::UnsupportedProfileConnection);
     }
     let mut new_lut = vec![0f32; (lut.len() / 4) * 3];
     if mab.a_curves.len() == 4 && !mab.clut.is_empty() {
-        const LERP_DEPTH: usize = 65536;
-        const BP: usize = 13;
-        const DEPTH: usize = 8192;
-
         let curve0 = mab.a_curves[0]
             .build_linearize_table::<u16, LERP_DEPTH, BP>()
             .ok_or(CmsError::InvalidTrcCurve)?;
@@ -145,17 +142,17 @@ pub(crate) fn prepare_mab_4x3<const GRID_SIZE: usize>(
 
     if mab.m_curves.len() == 3 {
         let curve0 = mab.m_curves[0]
-            .build_linearize_table::<u8, LERP_DEPTH, BP>()
+            .build_linearize_table::<u16, LERP_DEPTH, BP>()
             .ok_or(CmsError::InvalidTrcCurve)?;
         let curve1 = mab.m_curves[1]
-            .build_linearize_table::<u8, LERP_DEPTH, BP>()
+            .build_linearize_table::<u16, LERP_DEPTH, BP>()
             .ok_or(CmsError::InvalidTrcCurve)?;
         let curve2 = mab.m_curves[2]
-            .build_linearize_table::<u8, LERP_DEPTH, BP>()
+            .build_linearize_table::<u16, LERP_DEPTH, BP>()
             .ok_or(CmsError::InvalidTrcCurve)?;
         let matrix = mab.matrix;
         let bias = mab.bias;
-        let m_curves = MCurves3::<LERP_DEPTH> {
+        let m_curves = MCurves3::<DEPTH> {
             curve0,
             curve1,
             curve2,
@@ -167,10 +164,6 @@ pub(crate) fn prepare_mab_4x3<const GRID_SIZE: usize>(
     }
 
     if mab.b_curves.len() == 3 {
-        const LERP_DEPTH: usize = 65536;
-        const BP: usize = 13;
-        const DEPTH: usize = 8192;
-        
         let curve0 = mab.b_curves[0]
             .build_linearize_table::<u16, LERP_DEPTH, BP>()
             .ok_or(CmsError::InvalidTrcCurve)?;
