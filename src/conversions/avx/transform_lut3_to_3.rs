@@ -31,7 +31,9 @@ use crate::conversions::avx::TetrahedralAvxFma;
 use crate::conversions::avx::interpolator::{
     AvxMdInterpolation, PrismaticAvxFma, PyramidalAvxFma, SseAlignedF32, TrilinearAvxFma,
 };
-use crate::conversions::interpolator::BarycentricWeight;
+use crate::conversions::avx::interpolator_q1_15::SseAlignedI16;
+use crate::conversions::avx::transform_lut3_to_3_q1_15::TransformLut3x3AvxQ1_15;
+use crate::conversions::interpolator::{BarycentricWeight, BarycentricWeightQ1_15};
 use crate::conversions::lut_transforms::Lut3x3Factory;
 use crate::transform::PointeeSizeExpressible;
 use crate::{CmsError, InterpolationMethod, Layout, TransformExecutor, TransformOptions};
@@ -157,7 +159,7 @@ where
         if src_chunks != dst_chunks {
             return Err(CmsError::LaneSizeMismatch);
         }
-
+        
         unsafe {
             match self.interpolation_method {
                 InterpolationMethod::Tetrahedral => {
@@ -202,6 +204,35 @@ impl Lut3x3Factory for AvxLut3x3Factory {
         f32: AsPrimitive<T>,
         u32: AsPrimitive<T>,
     {
+        if options.prefer_fixed_point
+            && BIT_DEPTH < 15
+            && T::FINITE
+        {
+            const Q_SCALE: f32 = (1 << 15) as f32;
+            let lut = lut
+                .chunks_exact(3)
+                .map(|x| {
+                    SseAlignedI16([
+                        (x[0] * Q_SCALE).round() as i16,
+                        (x[1] * Q_SCALE).round() as i16,
+                        (x[2] * Q_SCALE).round() as i16,
+                        0,
+                    ])
+                })
+                .collect::<Vec<_>>();
+            return Box::new(TransformLut3x3AvxQ1_15::<
+                T,
+                SRC_LAYOUT,
+                DST_LAYOUT,
+                GRID_SIZE,
+                BIT_DEPTH,
+            > {
+                lut,
+                _phantom: PhantomData,
+                interpolation_method: options.interpolation_method,
+                weights: BarycentricWeightQ1_15::create_ranged_256::<GRID_SIZE>(),
+            });
+        }
         let lut = lut
             .chunks_exact(3)
             .map(|x| SseAlignedF32([x[0], x[1], x[2], 0f32]))
