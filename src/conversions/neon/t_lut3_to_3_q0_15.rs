@@ -118,16 +118,15 @@ where
 
             let tetrahedral = Interpolator::new(&self.lut);
             let v = tetrahedral.inter3_neon(x, y, z, &self.weights);
-            let o = vmax_s16(v.v, vdup_n_s16(0));
+            let mut o = vmax_s16(v.v, vdup_n_s16(0));
+            o = vmin_s16(o, v_max_scale);
             if T::FINITE {
-                let r = vmin_s16(o, v_max_scale);
-
-                dst[dst_cn.r_i()] = (vget_lane_s16::<0>(r) as u32).as_();
-                dst[dst_cn.g_i()] = (vget_lane_s16::<1>(r) as u32).as_();
-                dst[dst_cn.b_i()] = (vget_lane_s16::<2>(r) as u32).as_();
+                dst[dst_cn.r_i()] = (vget_lane_s16::<0>(o) as u32).as_();
+                dst[dst_cn.g_i()] = (vget_lane_s16::<1>(o) as u32).as_();
+                dst[dst_cn.b_i()] = (vget_lane_s16::<2>(o) as u32).as_();
             } else {
-                let o = vcvtq_f32_s32(vmovl_s16(v.v));
-                let r = vminq_f32(o, f_value_scale);
+                let o = vcvtq_f32_s32(vmovl_s16(o));
+                let r = vmulq_f32(o, f_value_scale);
                 dst[dst_cn.r_i()] = vgetq_lane_f32::<0>(r).as_();
                 dst[dst_cn.g_i()] = vgetq_lane_f32::<1>(r).as_();
                 dst[dst_cn.b_i()] = vgetq_lane_f32::<2>(r).as_();
