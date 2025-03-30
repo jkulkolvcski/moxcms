@@ -110,7 +110,9 @@ where
 
                 let w: i32 = k_weights.x;
                 let w_n: i32 = k_weights.x_n;
+                const Q: i16 = ((1i32 << 15) - 1) as i16;
                 let t: i16 = k_weights.w;
+                let t_n: i16 = Q - t;
 
                 let table1 = &self.lut[(w * grid_size3) as usize..];
                 let table2 = &self.lut[(w_n * grid_size3) as usize..];
@@ -119,9 +121,8 @@ where
                 let v = interpolator.inter3_sse(c, m, y, &self.weights);
                 let (a0, b0) = (v.0.v, v.1.v);
 
-                let t0 = _mm_set1_epi16(t);
-                let hp = _mm_sub_epi16(a0, _mm_mulhrs_epi16(t0, a0));
-                let v = _mm_add_epi16(hp, _mm_mulhrs_epi16(b0, t0));
+                let hp = _mm_mulhrs_epi16(_mm_set1_epi16(t_n), a0);
+                let v = _mm_add_epi16(hp, _mm_mulhrs_epi16(b0, _mm_set1_epi16(t)));
                 let mut o = _mm_max_epi16(v, _mm_setzero_si128());
                 o = _mm_min_epi16(o, v_max_scale);
 
