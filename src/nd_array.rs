@@ -50,7 +50,7 @@ pub(crate) fn lerp<
 /// 4D CLUT helper.
 ///
 /// Represents hypercube.
-pub struct Array4D<'a> {
+pub struct Hypercube<'a> {
     array: &'a [f32],
     x_stride: u32,
     y_stride: u32,
@@ -62,12 +62,12 @@ trait Fetcher4<T> {
     fn fetch(&self, x: i32, y: i32, z: i32, w: i32) -> T;
 }
 
-impl Array4D<'_> {
-    pub fn new(array: &[f32], grid_size: usize) -> Array4D {
+impl Hypercube<'_> {
+    pub fn new(array: &[f32], grid_size: usize) -> Hypercube {
         let z_stride = grid_size as u32;
         let y_stride = z_stride * z_stride;
         let x_stride = z_stride * z_stride * z_stride;
-        Array4D {
+        Hypercube {
             array,
             x_stride,
             y_stride,
@@ -81,29 +81,16 @@ impl Array4D<'_> {
         }
     }
 
-    pub fn new_hypercube(array: &[f32], grid_size: [u8; 4]) -> Array4D {
+    pub fn new_hypercube(array: &[f32], grid_size: [u8; 4]) -> Hypercube {
         let z_stride = grid_size[2] as u32;
         let y_stride = z_stride * grid_size[1] as u32;
         let x_stride = y_stride * grid_size[0] as u32;
-        Array4D {
+        Hypercube {
             array,
             x_stride,
             y_stride,
             z_stride,
             grid_size,
-        }
-    }
-
-    #[inline]
-    pub fn vec3(&self, x: i32, y: i32, z: i32, w: i32) -> Vector3f {
-        let start = (x as u32 * self.x_stride
-            + y as u32 * self.y_stride
-            + z as u32 * self.z_stride
-            + w as u32) as usize
-            * 3;
-        let k = &self.array[start..start + 3];
-        Vector3f {
-            v: [k[0], k[1], k[2]],
         }
     }
 }
@@ -152,7 +139,7 @@ impl Fetcher4<Vector4f> for Fetch4Vec4<'_> {
     }
 }
 
-impl Array4D<'_> {
+impl Hypercube<'_> {
     #[inline(always)]
     fn quadlinear<
         T: From<f32>
@@ -726,7 +713,7 @@ impl Array4D<'_> {
 /// 3D CLUT helper
 ///
 /// Represents hexahedron.
-pub struct Array3D<'a> {
+pub struct Cube<'a> {
     array: &'a [f32],
     x_stride: u32,
     y_stride: u32,
@@ -771,11 +758,11 @@ impl ArrayFetch<Vector4f> for ArrayFetchVector4f<'_> {
     }
 }
 
-impl Array3D<'_> {
-    pub fn new(array: &[f32], grid_size: usize) -> Array3D {
+impl Cube<'_> {
+    pub fn new(array: &[f32], grid_size: usize) -> Cube {
         let y_stride = grid_size;
         let x_stride = y_stride * y_stride;
-        Array3D {
+        Cube {
             array,
             x_stride: x_stride as u32,
             y_stride: y_stride as u32,
@@ -783,10 +770,10 @@ impl Array3D<'_> {
         }
     }
 
-    pub fn new_hexahedron(array: &[f32], grid_size: [u8; 3]) -> Array3D {
+    pub fn new_cube(array: &[f32], grid_size: [u8; 3]) -> Cube {
         let y_stride = grid_size[1] as u32;
         let x_stride = y_stride * grid_size[0] as u32;
-        Array3D {
+        Cube {
             array,
             x_stride,
             y_stride,
