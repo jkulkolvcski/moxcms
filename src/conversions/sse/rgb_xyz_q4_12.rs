@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::conversions::rgbxyz_fixed::TransformProfileRgbFixedPoint;
+use crate::conversions::rgbxyz_fixed::TransformMatrixShaperFixedPoint;
 use crate::conversions::sse::rgb_xyz::SseAlignedU16;
 use crate::transform::PointeeSizeExpressible;
 use crate::{CmsError, Layout, TransformExecutor};
@@ -45,11 +45,11 @@ pub(crate) struct TransformProfileRgbQ12Sse<
     const BIT_DEPTH: usize,
     const PRECISION: i32,
 > {
-    pub(crate) profile: TransformProfileRgbFixedPoint<i32, T, LINEAR_CAP>,
+    pub(crate) profile: TransformMatrixShaperFixedPoint<i32, T, LINEAR_CAP>,
 }
 
 #[inline(always)]
-unsafe fn _xmm_load_epi32(f: &i32) -> __m128i {
+pub(crate) unsafe fn _xmm_load_epi32(f: &i32) -> __m128i {
     let float_ref: &f32 = unsafe { &*(f as *const i32 as *const f32) };
     unsafe { _mm_castps_si128(_mm_load_ss(float_ref)) }
 }

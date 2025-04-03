@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::conversions::avx::rgb_xyz::AvxAlignedU16;
-use crate::conversions::rgbxyz_fixed::TransformProfileRgbFixedPoint;
+use crate::conversions::rgbxyz_fixed::TransformMatrixShaperFixedPoint;
 use crate::transform::PointeeSizeExpressible;
 use crate::{CmsError, Layout, TransformExecutor};
 use num_traits::AsPrimitive;
@@ -45,7 +45,7 @@ pub(crate) struct TransformProfilePcsXYZRgbQ12Avx<
     const BIT_DEPTH: usize,
     const PRECISION: i32,
 > {
-    pub(crate) profile: TransformProfileRgbFixedPoint<i32, T, LINEAR_CAP>,
+    pub(crate) profile: TransformMatrixShaperFixedPoint<i32, T, LINEAR_CAP>,
 }
 
 #[inline(always)]
