@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::conversions::TransformProfileRgb;
+use crate::conversions::TransformMatrixShaper;
 use crate::transform::PointeeSizeExpressible;
 use crate::{CmsError, Layout, TransformExecutor};
 use num_traits::AsPrimitive;
@@ -36,6 +36,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[repr(align(32), C)]
+#[derive(Debug)]
 pub(crate) struct AvxAlignedU16(pub(crate) [u16; 16]);
 
 pub(crate) struct TransformProfilePcsXYZRgbAvx<
@@ -46,7 +47,7 @@ pub(crate) struct TransformProfilePcsXYZRgbAvx<
     const GAMMA_LUT: usize,
     const BIT_DEPTH: usize,
 > {
-    pub(crate) profile: TransformProfileRgb<T, LINEAR_CAP>,
+    pub(crate) profile: TransformMatrixShaper<T, LINEAR_CAP>,
 }
 
 impl<
