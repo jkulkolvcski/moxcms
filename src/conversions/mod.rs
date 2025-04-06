@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(any(target_arch = "x86", target_arch = "x86_64"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
 mod bpc;
 mod gray2rgb;
