@@ -38,8 +38,8 @@ mod t_lut3_to_3;
 mod t_lut3_to_3_q0_15;
 
 pub(crate) use lut4_to_3::SseLut4x3Factory;
-pub(crate) use rgb_xyz::TransformProfilePcsXYZRgbSse;
-pub(crate) use rgb_xyz_opt::TransformProfilePcsXYZRgbOptSse;
-pub(crate) use rgb_xyz_q2_13::TransformProfileRgbQ2_13Sse;
-pub(crate) use rgb_xyz_q2_13_opt::TransformProfileRgbQ2_13OptSse;
+pub(crate) use rgb_xyz::TransformShaperRgbSse;
+pub(crate) use rgb_xyz_opt::TransformShaperRgbOptSse;
+pub(crate) use rgb_xyz_q2_13::TransformShaperQ2_13Sse;
+pub(crate) use rgb_xyz_q2_13_opt::TransformShaperQ2_13OptSse;
 pub(crate) use t_lut3_to_3::SseLut3x3Factory;
