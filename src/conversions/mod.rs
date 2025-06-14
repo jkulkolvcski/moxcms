@@ -33,6 +33,7 @@ mod avx512;
 mod bpc;
 mod gray2rgb;
 mod interpolator;
+mod katana;
 mod lut3x3;
 mod lut3x4;
 mod lut4;
@@ -53,6 +54,7 @@ mod sse;
 mod transform_lut3_to_3;
 mod transform_lut3_to_4;
 mod transform_lut4_to_3;
+mod xyz_lab;
 
 pub(crate) use gray2rgb::make_gray_to_x;
 pub(crate) use interpolator::LutBarycentricReduction;
