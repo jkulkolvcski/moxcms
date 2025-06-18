@@ -39,6 +39,40 @@ use crate::{
 use num_traits::AsPrimitive;
 use std::marker::PhantomData;
 
+pub(crate) fn execute_simple_curves3(dst: &mut [f32], curves: &[Vec<f32>; 3]) {
+    let curve0 = &curves[0];
+    let curve1 = &curves[1];
+    let curve2 = &curves[2];
+
+    for dst in dst.chunks_exact_mut(3) {
+        let a0 = dst[0];
+        let a1 = dst[1];
+        let a2 = dst[2];
+        let b0 = lut_interp_linear_float(a0, curve0);
+        let b1 = lut_interp_linear_float(a1, curve1);
+        let b2 = lut_interp_linear_float(a2, curve2);
+        dst[0] = b0;
+        dst[1] = b1;
+        dst[2] = b2;
+    }
+}
+
+pub(crate) fn execute_matrix_stage3(matrix: Matrix3f, bias: Vector3f, dst: &mut [f32]) {
+    let m = matrix;
+    let b = bias;
+
+    if !m.test_equality(Matrix3f::IDENTITY) || !b.eq(&Vector3f::default()) {
+        for dst in dst.chunks_exact_mut(3) {
+            let x = dst[0];
+            let y = dst[1];
+            let z = dst[2];
+            dst[0] = mlaf(mlaf(mlaf(b.v[0], x, m.v[0][0]), y, m.v[0][1]), z, m.v[0][2]);
+            dst[1] = mlaf(mlaf(mlaf(b.v[1], x, m.v[1][0]), y, m.v[1][1]), z, m.v[1][2]);
+            dst[2] = mlaf(mlaf(mlaf(b.v[2], x, m.v[2][0]), y, m.v[2][1]), z, m.v[2][2]);
+        }
+    }
+}
+
 struct Multidimensional4x3<
     T: Copy + Default + AsPrimitive<f32> + PointeeSizeExpressible + Send + Sync,
     const BIT_DEPTH: usize,
@@ -61,40 +95,6 @@ impl<
     const BIT_DEPTH: usize,
 > Multidimensional4x3<T, BIT_DEPTH>
 {
-    fn execute_matrix_stage(&self, dst: &mut [f32]) {
-        let m = self.matrix;
-        let b = self.bias;
-
-        if !m.test_equality(Matrix3f::IDENTITY) || !b.eq(&Vector3f::default()) {
-            for dst in dst.chunks_exact_mut(3) {
-                let x = dst[0];
-                let y = dst[1];
-                let z = dst[2];
-                dst[0] = mlaf(mlaf(mlaf(b.v[0], x, m.v[0][0]), y, m.v[0][1]), z, m.v[0][2]);
-                dst[1] = mlaf(mlaf(mlaf(b.v[1], x, m.v[1][0]), y, m.v[1][1]), z, m.v[1][2]);
-                dst[2] = mlaf(mlaf(mlaf(b.v[2], x, m.v[2][0]), y, m.v[2][1]), z, m.v[2][2]);
-            }
-        }
-    }
-
-    fn execute_simple_curves(&self, dst: &mut [f32], curves: &[Vec<f32>; 3]) {
-        let curve0 = &curves[0];
-        let curve1 = &curves[1];
-        let curve2 = &curves[2];
-
-        for dst in dst.chunks_exact_mut(3) {
-            let a0 = dst[0];
-            let a1 = dst[1];
-            let a2 = dst[2];
-            let b0 = lut_interp_linear_float(a0, curve0);
-            let b1 = lut_interp_linear_float(a1, curve1);
-            let b2 = lut_interp_linear_float(a2, curve2);
-            dst[0] = b0;
-            dst[1] = b1;
-            dst[2] = b2;
-        }
-    }
-
     fn to_pcs_impl<Fetch: Fn(f32, f32, f32, f32) -> Vector3f>(
         &self,
         input: &[T],
@@ -139,13 +139,13 @@ impl<
         // Matrix stage
 
         if let Some(m_curves) = self.m_curves.as_ref() {
-            self.execute_simple_curves(dst, m_curves);
-            self.execute_matrix_stage(dst);
+            execute_simple_curves3(dst, m_curves);
+            execute_matrix_stage3(self.matrix, self.bias, dst);
         }
 
         // B-curves is mandatory
         if let Some(b_curves) = &self.b_curves.as_ref() {
-            self.execute_simple_curves(dst, b_curves);
+            execute_simple_curves3(dst, b_curves);
         }
 
         Ok(())
